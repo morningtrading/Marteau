@@ -1,7 +1,7 @@
 [project]
-name = "jev-loop"
+name = "marteau"
 version = "0.1.0"
-description = "A 24/7 paper-trading loop: deterministic state, a seven-question Jev battery, code-owned policy and risk, Alpaca paper execution."
+description = "A fork of jev-loop (BOMBO): deterministic state, a seven-question Jev battery, code-owned policy and risk, plus a dry-execution-only Hyperliquid perpetuals loop alongside the original Alpaca paper-trading loop."
 requires-python = ">=3.10"
 dependencies = [
     "requests>=2.31",
@@ -11,6 +11,12 @@ dependencies = [
 [project.optional-dependencies]
 calibrate = ["matplotlib>=3.8"]
 dev = ["pytest>=8.0"]
+# Optional: only needed for loop_hyperliquid.py's real-time trade tape
+# (execution/hyperliquid.py's HyperliquidTradeTape). Without it, the dry
+# loop still runs -- get_recent_trades() degrades honestly to an empty
+# list, the same "no fabricated data" rule the rest of this codebase
+# follows for missing L2 depth on equities.
+hyperliquid = ["websocket-client>=1.7"]
 
 [project.scripts]
 jev-loop = "jevloop.__main__:main"

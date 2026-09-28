@@ -95,3 +95,67 @@ def test_default_perp_limits_raises_leverage_above_alpaca_default():
     assert perp.max_position_usd == alpaca.max_position_usd
     assert perp.max_daily_loss_usd == alpaca.max_daily_loss_usd
     assert perp.max_drawdown_pct == alpaca.max_drawdown_pct
+
+
+# -- regression test for a real bug found running this against live market
+# data: _simulate_action's own risk_check() can return a KILL verdict (e.g.
+# max_position_usd breached) that run() must detect and act on -- flatten
+# the simulated position and stop -- exactly like loop.py does for the
+# Alpaca path. The first version of this file was missing that check: it
+# printed "KILL (max_position_usd breached)" every tick forever without
+# ever flattening or stopping. This test would have caught it. ------------
+
+
+def test_run_flattens_and_stops_when_simulate_action_returns_kill(monkeypatch, tmp_path):
+    import jevloop.loop_hyperliquid as lh
+
+    monkeypatch.setattr(lh, "LOG_DIR", tmp_path)
+    monkeypatch.setattr(lh, "LOG_FILE", tmp_path / "hyperliquid-log.jsonl")
+    monkeypatch.setattr(lh, "LATEST_FILE", tmp_path / "hyperliquid-latest.json")
+
+    class FakeClient:
+        coin = "BTC"
+
+        def get_orderbook(self):
+            return {"b": [(100.0, 1.0)], "a": [(100.2, 1.0)]}
+
+        def get_mark_oracle_funding(self):
+            return 100.1, 100.05, 0.0001
+
+    class FakeTape:
+        def __init__(self, coin, **kw):
+            pass
+
+        def start(self):
+            pass
+
+        def stop(self):
+            pass
+
+        def get_recent_trades(self, since_ts):
+            return []
+
+    monkeypatch.setattr(lh, "client_from_env", lambda coin: FakeClient())
+    monkeypatch.setattr(lh, "HyperliquidTradeTape", FakeTape)
+
+    # Force _simulate_action's internal risk_check to KILL on every call,
+    # regardless of the actual snapshot, so the test is about run()'s
+    # handling of that verdict, not about reproducing a real breach.
+    from jevloop.risk import RiskVerdict
+
+    monkeypatch.setattr(
+        lh, "risk_check", lambda *a, **k: RiskVerdict(False, "forced test kill", kill=True)
+    )
+
+    # Give the loop something to buy first, via a mock client whose answers
+    # are irrelevant here -- what matters is that risk_check always kills.
+    rc = lh.run(coin_symbol="BTC-PERP", ticks=10, mock=True, limits=default_perp_limits())
+    assert rc == 0
+
+    lines = (tmp_path / "hyperliquid-log.jsonl").read_text().strip().splitlines()
+    # The loop must stop at the first KILL tick, not run all 10 ticks.
+    assert len(lines) == 1
+    import json
+
+    record = json.loads(lines[0])
+    assert record["rung"] == "kill"

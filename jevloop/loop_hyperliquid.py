@@ -343,6 +343,14 @@ def run(
                 )
                 if extra_fill != "-":
                     fill_txt = extra_fill if fill_txt == "-" else f"{fill_txt}; {extra_fill}"
+                if line_action.startswith("KILL"):
+                    # A hard risk limit tripped inside _simulate_action's own
+                    # risk_check() call (e.g. max_position_usd), not caught by
+                    # the rung/action.kind check above. Same pattern loop.py
+                    # uses for the Alpaca path -- missing this meant a real
+                    # risk breach printed "KILL (...)" every tick forever
+                    # without ever actually flattening or stopping.
+                    kill = True
 
             if kill:
                 rung = Rung.KILL

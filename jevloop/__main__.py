@@ -1,4 +1,4 @@
-"""CLI dispatcher: `jev-loop run|calibrate|serve|validate-symbol|explain-split`.
+"""CLI dispatcher: `jev-loop run|run-hyperliquid|calibrate|serve|validate-symbol|explain-split`.
 
 Also invocable as `uv run python -m jevloop <command> ...` from inside the
 skill directory, which is what the /jev-loop skill's SKILL.md tells Claude
@@ -9,29 +9,42 @@ from __future__ import annotations
 
 import sys
 
-USAGE = "usage: jev-loop <run|calibrate|serve|validate-symbol|explain-split> [options]"
+USAGE = (
+    "usage: jev-loop <run|run-hyperliquid|calibrate|serve|validate-symbol|explain-split> [options]"
+)
 
 
 def _validate_symbol(argv: list[str]) -> int:
-    from .assets import UnknownSymbolError, resolve_symbol
+    from .assets import UnknownSymbolError, resolve_perp_symbol, resolve_symbol
 
     if not argv:
         print("usage: jev-loop validate-symbol <SYMBOL>")
         return 1
     try:
         spec = resolve_symbol(argv[0])
-    except UnknownSymbolError as exc:
-        print(str(exc))
-        return 1
+    except UnknownSymbolError:
+        try:
+            spec = resolve_perp_symbol(argv[0])
+        except UnknownSymbolError as exc:
+            print(str(exc))
+            return 1
 
-    session = "24/7 (crypto)" if spec.is_24_7 else "market hours only (US equity)"
+    if spec.venue == "hyperliquid_perp":
+        session = "24/7 (Hyperliquid perp)"
+    elif spec.is_24_7:
+        session = "24/7 (crypto)"
+    else:
+        session = "market hours only (US equity)"
     print(f"resolved: {spec.symbol}")
     print(f"  asset class:       {spec.asset_class}")
+    print(f"  venue:             {spec.venue}")
     print(f"  session:           {session}")
     print(f"  min order notional: ${spec.min_notional_usd:.2f}")
     print(f"  quantity precision: {spec.qty_precision} decimal places")
     print(f"  shorting allowed:   {spec.shorting_allowed}")
     print(f"  order book depth:   {'yes' if spec.has_depth else 'best bid/ask only'}")
+    if spec.liquidation_aware:
+        print(f"  leverage (config): {spec.leverage:g}x")
     return 0
 
 
@@ -52,6 +65,10 @@ def main() -> int:
         from . import loop
 
         return loop.main(rest)
+    if command == "run-hyperliquid":
+        from . import loop_hyperliquid
+
+        return loop_hyperliquid.main(rest)
     if command == "calibrate":
         from . import calibrate
 

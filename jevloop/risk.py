@@ -4,6 +4,16 @@ Never delegates to Jev. Every limit here is checkable from something other
 than the model's own claim: a number in the snapshot, a counter the loop
 itself keeps. A KILL verdict means flatten and stop, not "ask the model
 whether it's really that bad".
+
+Perp note: check #9 below (max_leverage) now reads a real, per-asset
+snapshot["leverage"] instead of the Alpaca path's hardcoded 1.0 (see
+state.py's build_snapshot leverage= kwarg and limits.default_perp_limits()).
+That is still only a ceiling on the *configured* leverage a perp spec
+reports, not a live margin-derived leverage, and there is no
+liquidation-price check anywhere in this file: Marteau has no wallet or
+real account balance in this phase, so there is no real margin or
+liquidation price to compute. That is explicit, deferred, future work for
+the live-trading phase (see README.md), not an oversight here.
 """
 
 from __future__ import annotations

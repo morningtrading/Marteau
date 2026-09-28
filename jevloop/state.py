@@ -228,15 +228,45 @@ def build_snapshot(
     inv: InventoryState,
     data_timestamp: float,
     has_depth: bool = True,
+    leverage: float = 1.0,
+    funding_rate: float | None = None,
+    oracle_px: float | None = None,
+    cancel_events: list[float] | None = None,
+    cancel_window_s: float = 60.0,
 ) -> dict:
     """Assemble the deterministic snapshot. All list inputs must already be
-    filtered to timestamps <= as_of by the caller (execution/alpaca.py).
+    filtered to timestamps <= as_of by the caller (execution/alpaca.py or
+    loop_hyperliquid.py).
 
     `has_depth` is False for venues with no Level 2 book (equities on the
     basic feed): `bid_depth`/`ask_depth` are then expected to hold at most
     one (price, size) pair each, taken from the best bid/ask of the latest
     quote, and `imbalance` is computed from that single level rather than
-    three, or left `None` if even that is unavailable."""
+    three, or left `None` if even that is unavailable.
+
+    The remaining keyword arguments are all trailing and defaulted, added
+    for the Hyperliquid perp path without changing a single byte of the
+    Alpaca call site in execution/alpaca.py / loop.py:
+
+    `leverage` overrides the snapshot's hardcoded 1.0 (true for both of
+    Alpaca's spot/cash asset classes; not true for a perp, where risk.py's
+    max_leverage check needs the asset's real leverage to mean anything).
+
+    `funding_rate` and `oracle_px` are cheap additions from Hyperliquid's
+    metaAndAssetCtxs (see execution/hyperliquid.py's
+    get_mark_oracle_funding()): `funding_rate` passes straight through,
+    `basis_bps` is derived here as (mark - oracle) / oracle in basis points
+    -- the cheap "is the market trading away from fair value" signal, mark
+    being this function's own `mid` argument. Both are None when not
+    supplied, exactly as before this file grew perp support.
+
+    `cancel_events`, if supplied, is a list of epoch timestamps for
+    cancel/replace events the caller already knows about locally (there is
+    no direct Hyperliquid field for this -- see the loop_hyperliquid.py
+    dry-execution engine, which owns its own simulated cancel/replace
+    timestamps). `cancel_rate_per_min` is derived from it with exactly the
+    same trailing-window-count pattern `trade_intensity_per_s` already uses
+    above, just over `cancel_window_s` seconds instead of 30."""
 
     bid_sz = sum(sz for _, sz in bid_depth[:3])
     ask_sz = sum(sz for _, sz in ask_depth[:3])
@@ -270,6 +300,16 @@ def build_snapshot(
     data_age_s = max(0.0, as_of - data_timestamp)
 
     vwap = inv.vwap_cum_pv / inv.vwap_cum_vol if inv.vwap_cum_vol > 0 else mid
+
+    basis_bps = (
+        round((mid - oracle_px) / oracle_px * 10_000, 2)
+        if oracle_px is not None and oracle_px > 0
+        else None
+    )
+    cancel_rate_per_min = None
+    if cancel_events is not None:
+        window = [t for t in cancel_events if as_of - cancel_window_s <= t <= as_of]
+        cancel_rate_per_min = round(len(window) / cancel_window_s * 60.0, 4)
 
     return {
         "as_of": as_of,
@@ -307,7 +347,11 @@ def build_snapshot(
         "last_10_latencies_ms": inv.recent_latencies_ms[-10:],
         "last_10_slippage_bps": inv.recent_slippage_bps[-10:],
         "data_age_s": round(data_age_s, 3),
-        "leverage": 1.0,
+        "leverage": leverage,
+        # PERP (None on the Alpaca path, which never passes these kwargs)
+        "funding_rate": funding_rate,
+        "basis_bps": basis_bps,
+        "cancel_rate_per_min": cancel_rate_per_min,
     }
 
 

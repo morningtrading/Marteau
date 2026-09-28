@@ -6,11 +6,18 @@ a hook that can override or veto its output. This file owns the ceiling
 that hook can never raise: nine limits, checked in risk.py before every
 order, plus the operational numbers for ladder.py, pricing.py, and
 execution/alpaca.py.
+
+default_perp_limits() below is a Hyperliquid-flavoured Limits for
+loop_hyperliquid.py's dry-execution engine: same nine hard vetoes, just
+max_leverage raised from Alpaca's hardcoded 1.0 (spot/cash, no leverage
+ever) to a still-conservative default for a leveraged perp, and its own
+API rate-limit number instead of Alpaca's. It changes nothing about the
+plain Limits() Alpaca has always used.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 
 @dataclass
@@ -58,4 +65,39 @@ class Limits:
     )
     max_alpaca_calls_per_minute: int = (
         90  # stays under Alpaca's free-tier data/trading limits
+    )
+
+    # --- execution/hyperliquid.py ---
+    max_hyperliquid_calls_per_minute: int = (
+        100  # comfortably under Hyperliquid's public /info rate limit
+    )
+
+
+# Default multiplier used to size max_position_usd -> a rough notional cap
+# consistent with the leverage below, for whoever reads this file rather
+# than the loop's printed banner. Not read by any code path.
+_DEFAULT_PERP_LEVERAGE = 3.0
+
+
+def default_perp_limits() -> Limits:
+    """A Limits for the Hyperliquid dry-execution loop. Everything except
+    max_leverage and max_hyperliquid_calls_per_minute stays at Limits()'s
+    own defaults -- the same dollar caps, the same drawdown kill, the same
+    stale-data and API-error ceilings. max_leverage moves from Alpaca's
+    hardcoded 1.0 (this account can never use leverage) to 3.0, matching
+    assets.py's _DEFAULT_PERP_LEVERAGE for the perp specs this repo
+    resolves today.
+
+    This is deliberately still just a ceiling on the *configured* leverage
+    the snapshot reports (assets.AssetSpec.leverage), not a live margin/
+    liquidation-price computation: Marteau has no wallet or real account in
+    this phase, so there is no real margin to measure. A dynamic
+    leverage-from-margin check, and the liquidation-price risk machinery
+    that would need, is explicitly out of scope here -- see risk.py's
+    module docstring and README.md's "not yet implemented" section. That
+    is part of the live-trading phase, not this one.
+    """
+    return replace(
+        Limits(),
+        max_leverage=_DEFAULT_PERP_LEVERAGE,
     )

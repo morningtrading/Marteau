@@ -372,7 +372,14 @@ def run(
                 "funding_rate": funding_rate,
                 "basis_bps": snapshot["basis_bps"],
                 "regime": answers["regime"]["choice"] if answers else None,
+                "regime_conf": answers["regime"]["confidence"] if answers else None,
                 "direction": answers["direction"]["choice"] if answers else None,
+                "direction_conf": answers["direction"]["confidence"] if answers else None,
+                "toxic_flow": answers["toxic_flow"]["noul"] if answers else None,
+                "liquidity_stressed": answers["liquidity_stressed"]["noul"] if answers else None,
+                "quote_environment": answers["quote_environment"]["score"] if answers else None,
+                "inventory_pressure": answers["inventory_pressure"]["score"] if answers else None,
+                "execution_health": answers["execution_health"]["score"] if answers else None,
                 "action": action.kind if action else "HOLD_LATE",
                 "action_reason": action.reason if action else "block deadline exceeded",
                 "rung": rung.value,
@@ -395,9 +402,13 @@ def run(
                 if answers
                 else "n/a"
             )
+            tox_txt = f"{answers['toxic_flow']['noul']:.2f}" if answers else "n/a"
+            env_txt = f"{answers['quote_environment']['score']:.1f}" if answers else "n/a"
+            xh_txt = f"{answers['execution_health']['score']:.1f}" if answers else "n/a"
             print(
                 f"tick {block} | mid {_fmt_money(mid)} | funding {funding_rate:+.6f} | "
                 f"basis {snapshot['basis_bps']} bps | regime {regime_txt} | "
+                f"tox {tox_txt} | env {env_txt} | xh {xh_txt} | "
                 f"{line_action} | {fill_txt}"
             )
 

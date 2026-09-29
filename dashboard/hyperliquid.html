@@ -354,6 +354,36 @@
       .snap .k {
         color: var(--muted);
       }
+      .quotetbl {
+        margin-top: 10px;
+        width: 100%;
+        border-collapse: collapse;
+        font-family: var(--mono);
+        font-size: 11.5px;
+      }
+      .quotetbl th {
+        text-align: left;
+        font-weight: 500;
+        color: var(--muted);
+        font-size: 10.5px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        padding: 4px 8px;
+        border-bottom: 1px solid var(--hair2);
+      }
+      .quotetbl td {
+        padding: 6px 8px;
+        color: var(--ink2);
+        border-bottom: 1px solid var(--hair);
+      }
+      .quotetbl td.wide {
+        color: var(--amber);
+        font-weight: 500;
+      }
+      .quotetbl td.tight {
+        color: var(--green);
+        font-weight: 500;
+      }
       .chart {
         margin-top: 10px;
         flex: 1;
@@ -676,6 +706,21 @@
             </div>
           </div>
           <div class="snap" id="snap"></div>
+          <table class="quotetbl">
+            <thead>
+              <tr>
+                <th>Broker</th>
+                <th>Account</th>
+                <th>Preset</th>
+                <th>Bid</th>
+                <th>Ask</th>
+                <th>Spread (bps)</th>
+                <th>Spread (%)</th>
+                <th>Spread ($)</th>
+              </tr>
+            </thead>
+            <tbody id="quotetbl"></tbody>
+          </table>
           <div class="chart"><svg id="svg"></svg></div>
           <div class="strip" id="strip"></div>
           <div class="foot">
@@ -857,6 +902,30 @@
           `<span class=k>inv pressure</span><span><b>${t.inventory_pressure != null ? t.inventory_pressure.toFixed(2) : "—"}</b></span>` +
           `<span class=k>execution health</span><span><b>${t.execution_health != null ? t.execution_health.toFixed(2) : "—"}</b></span>` +
           `<span class=k>rung</span><span><b>${t.rung || "—"}</b></span>`;
+
+        const quoting = t.action === "QUOTE_WIDE" || t.action === "QUOTE_BOTH_SIDES";
+        const isWide = t.spread_multiplier !== 0.5;
+        const presetTxt = t.spread_multiplier != null ? (isWide ? "WIDE" : "TIGHT") : "—";
+        const presetCls = t.spread_multiplier != null ? (isWide ? "wide" : "tight") : "";
+        let spreadBps = "—",
+          spreadPct = "—",
+          spreadUsd = "—",
+          bidTxt = "—",
+          askTxt = "—";
+        if (quoting && t.bid_px != null && t.ask_px != null && t.mid) {
+          const diff = t.ask_px - t.bid_px;
+          spreadUsd = diff.toFixed(2);
+          spreadPct = ((diff / t.mid) * 100).toFixed(4) + "%";
+          spreadBps = ((diff / t.mid) * 10000).toFixed(2);
+          bidTxt = t.bid_px.toLocaleString(undefined, { maximumFractionDigits: 2 });
+          askTxt = t.ask_px.toLocaleString(undefined, { maximumFractionDigits: 2 });
+        }
+        $("quotetbl").innerHTML =
+          `<tr><td>${t.broker || "hyperliquid"}</td>` +
+          `<td>N/A (dry)</td>` +
+          `<td class="${presetCls}">${presetTxt}</td>` +
+          `<td>${bidTxt}</td><td>${askTxt}</td>` +
+          `<td>${spreadBps}</td><td>${spreadPct}</td><td>${spreadUsd === "—" ? "—" : "$" + spreadUsd}</td></tr>`;
 
         const sideEl = $("side"),
           word = $("word");

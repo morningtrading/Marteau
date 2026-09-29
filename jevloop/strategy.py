@@ -62,6 +62,12 @@ class StrategyThresholds:
     # less room for error) when Jev is confident; QUOTE_WIDE stays cautious.
     both_sides_spread_multiplier: float = 0.5
 
+    # A directional leg that would grow the position further in the same
+    # direction is skipped once |inventory| * mid reaches this fraction of
+    # limits.max_position_usd -- a run of same-direction ticks then just
+    # keeps quoting instead of stacking legs straight into a KILL.
+    directional_leg_position_cap_fraction: float = 0.7
+
 
 THRESHOLDS = StrategyThresholds()
 

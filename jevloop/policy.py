@@ -92,7 +92,21 @@ def _compose_from_thresholds(answers: dict, snapshot: dict, limits: Limits) -> A
             direction["choice"] != "neutral"
             and direction["confidence"] > THRESHOLDS.direction_confidence_threshold
         ):
-            action.direction_leg = direction["choice"]
+            # A run of same-direction ticks (Jev staying confident for
+            # several ticks in a row) used to stack a fresh leg on every one
+            # of them with no check against the position already built,
+            # marching straight into max_position_usd and a KILL. Only skip
+            # the leg when it would grow an already-large position further
+            # in the same direction; a leg that reduces or flattens is
+            # always allowed, same as before.
+            inventory = snapshot["inventory"]
+            would_grow = (direction["choice"] == "up" and inventory >= 0) or (
+                direction["choice"] == "down" and inventory <= 0
+            )
+            position_usd = abs(inventory) * snapshot.get("mid", 0.0)
+            cap = limits.max_position_usd * THRESHOLDS.directional_leg_position_cap_fraction
+            if not would_grow or position_usd < cap:
+                action.direction_leg = direction["choice"]
 
     return action
 

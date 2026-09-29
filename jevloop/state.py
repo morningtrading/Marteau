@@ -89,6 +89,8 @@ class InventoryState:
     high_water_mark_usd: float = 0.0
     equity_usd: float = 0.0  # starting equity; seeded from the account at startup
     fills: int = 0
+    buy_fills: int = 0
+    sell_fills: int = 0
     orders_submitted: int = 0
     orders_rejected: int = 0
     api_error_streak: int = 0
@@ -148,6 +150,10 @@ def apply_fill(
     fill price."""
     if qty <= 0 or price <= 0:
         return
+    if side == "buy":
+        inv.buy_fills += 1
+    else:
+        inv.sell_fills += 1
     signed = qty if side == "buy" else -qty
     old = inv.inventory
     new = old + signed

@@ -37,6 +37,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import socket
 import sys
 import time
 from pathlib import Path
@@ -395,7 +396,7 @@ def run(
             recent_ticks.append(record)
             if len(recent_ticks) > 120:
                 recent_ticks = recent_ticks[-120:]
-            _write_latest(spec.symbol, block, recent_ticks, started_at)
+            _write_latest(spec.symbol, block, recent_ticks, started_at, inv=inv)
 
             regime_txt = (
                 f"{answers['regime']['choice']} {answers['regime']['confidence']*100:.0f}%"
@@ -508,13 +509,22 @@ def _append_log(record: dict) -> None:
         f.write(json.dumps(record) + "\n")
 
 
-def _write_latest(symbol: str, block: int, ticks: list[dict], started_at: float) -> None:
+def _write_latest(
+    symbol: str, block: int, ticks: list[dict], started_at: float, inv=None
+) -> None:
     payload = {
         "generated_at": time.time(),
         "symbol": symbol,
         "block": block,
         "ticks": ticks,
-        "stats": {"uptime_s": time.time() - started_at, "venue": "hyperliquid_perp (dry)"},
+        "stats": {
+            "uptime_s": time.time() - started_at,
+            "venue": "hyperliquid_perp (dry)",
+            "hostname": socket.gethostname(),
+            "trading_mode": "dry",
+            "buy_fills": inv.buy_fills if inv else 0,
+            "sell_fills": inv.sell_fills if inv else 0,
+        },
     }
     tmp = LATEST_FILE.with_name(f"{LATEST_FILE.name}.{os.getpid()}.tmp")
     tmp.write_text(json.dumps(payload))

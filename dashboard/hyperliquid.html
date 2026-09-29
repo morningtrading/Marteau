@@ -201,6 +201,37 @@
           opacity: 0.35;
         }
       }
+      .topline {
+        display: flex;
+        gap: 18px;
+        flex-wrap: wrap;
+        font-family: var(--mono);
+        font-size: 11.5px;
+        color: var(--ink3);
+        padding-bottom: 8px;
+        margin-bottom: 10px;
+        border-bottom: 1px solid var(--hair);
+      }
+      .topline b {
+        color: var(--ink);
+        font-weight: 500;
+      }
+      .topline .mode {
+        padding: 1px 8px;
+        border-radius: 999px;
+        background: var(--amber-soft);
+        color: var(--amber);
+      }
+      .topline .mode.live {
+        background: var(--red-soft);
+        color: var(--red);
+      }
+      .topline .buy {
+        color: var(--green);
+      }
+      .topline .sell {
+        color: var(--red);
+      }
       .stats {
         display: flex;
         gap: 22px;
@@ -564,6 +595,14 @@
   </head>
   <body>
     <div class="frame">
+      <div class="topline" id="topline">
+        <span>host <b id="tlhost">—</b></span
+        ><span>bot <b>MRT / Marteau</b></span
+        ><span>up <b id="tlup">00:00:00</b></span
+        ><span class="mode" id="tlmode">DRY</span
+        ><span class="buy">buys <b id="tlbuys">0</b></span
+        ><span class="sell">sells <b id="tlsells">0</b></span>
+      </div>
       <header>
         <div class="brand"><b>MRT</b><i>Marteau · Hyperliquid perp</i></div>
         <span class="block">tick <span id="blk">—</span></span>
@@ -765,9 +804,16 @@
         $("calls").textContent = ticks.length.toLocaleString();
         $("late").textContent = lateCount;
         const upS = Math.floor((Date.now() - startedAt) / 1000);
-        $("up").textContent = [upS / 3600, (upS % 3600) / 60, upS % 60]
+        const upTxt = [upS / 3600, (upS % 3600) / 60, upS % 60]
           .map((x) => String(Math.floor(x)).padStart(2, "0"))
           .join(":");
+        $("up").textContent = upTxt;
+
+        $("tlhost").textContent = stats.hostname || "—";
+        $("tlup").textContent = upTxt;
+        $("tlmode").textContent = (stats.trading_mode || "dry").toUpperCase();
+        $("tlbuys").textContent = (stats.buy_fills || 0).toLocaleString();
+        $("tlsells").textContent = (stats.sell_fills || 0).toLocaleString();
 
         $("pos").textContent = !t.inventory
           ? "flat"

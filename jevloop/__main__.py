@@ -10,7 +10,8 @@ from __future__ import annotations
 import sys
 
 USAGE = (
-    "usage: jev-loop <run|run-hyperliquid|calibrate|serve|validate-symbol|explain-split> [options]"
+    "usage: jev-loop <run|run-hyperliquid|calibrate|serve|serve-hyperliquid|"
+    "validate-symbol|explain-split> [options]"
 )
 
 
@@ -77,6 +78,10 @@ def main() -> int:
         from . import serve
 
         return serve.main(rest)
+    if command == "serve-hyperliquid":
+        from . import serve_hyperliquid
+
+        return serve_hyperliquid.main(rest)
     if command == "validate-symbol":
         return _validate_symbol(rest)
     if command == "explain-split":
